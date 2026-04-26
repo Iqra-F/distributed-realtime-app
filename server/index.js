@@ -2,6 +2,7 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
+const Redis = require("ioredis");
 
 const app = express();
 app.use(cors());
@@ -14,30 +15,42 @@ const io = new Server(server, {
   },
 });
 
-// Store subscriptions in memory (temporary)
-const userSubscriptions = {};
+// 🔴 Redis setup
+const pub = new Redis({
+  host: "redis", // docker service name
+  port: 6379,
+});
+
+const sub = new Redis({
+  host: "redis",
+  port: 6379,
+});
+
+// 🔴 Listen to Redis messages
+sub.subscribe("MESSAGES");
+
+sub.on("message", (channel, message) => {
+  const data = JSON.parse(message);
+
+  // Emit to all users in that topic (room)
+  io.to(data.topic).emit("message", data);
+});
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Join a topic
+  // Join topic
   socket.on("subscribe", (topic) => {
-    if (!userSubscriptions[topic]) {
-      userSubscriptions[topic] = [];
-    }
-    userSubscriptions[topic].push(socket.id);
-
     socket.join(topic);
-
     console.log(`User ${socket.id} subscribed to ${topic}`);
   });
 
-  // Send message to topic
+  // Publish message via Redis
   socket.on("publish", ({ topic, message }) => {
-    io.to(topic).emit("message", {
-      topic,
-      message,
-    });
+    pub.publish(
+      "MESSAGES",
+      JSON.stringify({ topic, message })
+    );
   });
 
   socket.on("disconnect", () => {
