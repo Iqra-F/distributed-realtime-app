@@ -15,7 +15,7 @@ const io = new Server(server, {
   },
 });
 
-// 🔴 Redis setup
+// 🔴 Redis connections
 const pub = new Redis({
   host: "redis", // docker service name
   port: 6379,
@@ -26,30 +26,46 @@ const sub = new Redis({
   port: 6379,
 });
 
-// 🔴 Listen to Redis messages
-sub.subscribe("MESSAGES");
+// 🔴 Track which topics THIS server already subscribed to
+const subscribedTopics = new Set();
 
+// 🔴 Listen to Redis messages (global, runs once)
 sub.on("message", (channel, message) => {
   const data = JSON.parse(message);
 
-  // Emit to all users in that topic (room)
-  io.to(data.topic).emit("message", data);
+  // channel === topic
+  io.to(channel).emit("message", data);
 });
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  // Join topic
+  // 🟢 Subscribe user to topic
   socket.on("subscribe", (topic) => {
-    socket.join(topic);
-    console.log(`User ${socket.id} subscribed to ${topic}`);
+    const cleanTopic = topic.trim().toLowerCase();
+
+    socket.join(cleanTopic);
+
+    // Subscribe to Redis channel ONLY ONCE per topic
+    if (!subscribedTopics.has(cleanTopic)) {
+      sub.subscribe(cleanTopic);
+      subscribedTopics.add(cleanTopic);
+      console.log(`Subscribed to Redis channel: ${cleanTopic}`);
+    }
+
+    console.log(`User ${socket.id} subscribed to ${cleanTopic}`);
   });
 
-  // Publish message via Redis
+  // 🟠 Publish message via Redis
   socket.on("publish", ({ topic, message }) => {
+    const cleanTopic = topic.trim().toLowerCase();
+
     pub.publish(
-      "MESSAGES",
-      JSON.stringify({ topic, message })
+      cleanTopic,
+      JSON.stringify({
+        topic: cleanTopic,
+        message,
+      })
     );
   });
 
@@ -58,6 +74,7 @@ io.on("connection", (socket) => {
   });
 });
 
+// Simple health route
 app.get("/", (req, res) => {
   res.send("Realtime server running");
 });
