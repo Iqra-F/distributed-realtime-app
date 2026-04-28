@@ -3,6 +3,8 @@ const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 const Redis = require("ioredis");
+const os = require("os");
+const { createAdapter } = require("@socket.io/redis-adapter");
 
 const app = express();
 app.use(cors());
@@ -11,74 +13,67 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+    credentials: true,
   },
+  transports: ["websocket", "polling"],
 });
 
-// 🔴 Redis connections
-const pub = new Redis({
-  host: "redis", // docker service name
-  port: 6379,
-});
-
-const sub = new Redis({
+// =====================
+// Redis setup (ONLY for adapter)
+// =====================
+const pubClient = new Redis({
   host: "redis",
   port: 6379,
 });
 
-// 🔴 Track which topics THIS server already subscribed to
-const subscribedTopics = new Set();
+const subClient = pubClient.duplicate();
 
-// 🔴 Listen to Redis messages (global, runs once)
-sub.on("message", (channel, message) => {
-  const data = JSON.parse(message);
+// IMPORTANT: wait for Redis before attaching adapter
+Promise.all([
+  pubClient.connect?.(),
+  subClient.connect?.(),
+]).catch(() => {});
 
-  // channel === topic
-  io.to(channel).emit("message", data);
-});
+// Attach adapter (THIS is the core scaling layer)
+io.adapter(createAdapter(pubClient, subClient));
+
+// =====================
+// Socket logic
+// =====================
+const instanceId = os.hostname();
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log(`🟢 Connected: ${socket.id} on ${instanceId}`);
 
-  // 🟢 Subscribe user to topic
   socket.on("subscribe", (topic) => {
-    const cleanTopic = topic.trim().toLowerCase();
-
-    socket.join(cleanTopic);
-
-    // Subscribe to Redis channel ONLY ONCE per topic
-    if (!subscribedTopics.has(cleanTopic)) {
-      sub.subscribe(cleanTopic);
-      subscribedTopics.add(cleanTopic);
-      console.log(`Subscribed to Redis channel: ${cleanTopic}`);
-    }
-
-    console.log(`User ${socket.id} subscribed to ${cleanTopic}`);
+    const room = topic.trim().toLowerCase();
+    socket.join(room);
+    console.log(`📌 ${socket.id} joined ${room}`);
   });
 
-  // 🟠 Publish message via Redis
   socket.on("publish", ({ topic, message }) => {
-    const cleanTopic = topic.trim().toLowerCase();
+    const room = topic.trim().toLowerCase();
 
-    pub.publish(
-      cleanTopic,
-      JSON.stringify({
-        topic: cleanTopic,
-        message,
-      })
-    );
+    // Broadcast to ALL servers automatically via Redis adapter
+    io.to(room).emit("message", {
+      topic: room,
+      message,
+      from: instanceId,
+    });
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log(`🔴 Disconnected: ${socket.id}`);
   });
 });
 
-// Simple health route
+// Health check
 app.get("/", (req, res) => {
   res.send("Realtime server running");
 });
 
 server.listen(5000, () => {
-  console.log("Server running on port 5000");
+  console.log("🚀 Server running on port 5000");
 });

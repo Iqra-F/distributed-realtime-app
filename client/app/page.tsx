@@ -10,7 +10,11 @@ export default function Home() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const newSocket = io("http://localhost:5000");
+    const newSocket = io("http://localhost", {
+      path: "/socket.io",
+      transports: ["polling", "websocket"],
+      upgrade: false,
+    });
 
     newSocket.on("connect", () => {
       setConnected(true);
@@ -18,6 +22,7 @@ export default function Home() {
     });
 
     newSocket.on("message", (data) => {
+      console.log("Message received from:", data.from);
       setMessages((prev) => [...prev, data.message]);
     });
 
@@ -27,11 +32,13 @@ export default function Home() {
   }, []);
 
   const subscribe = () => {
-    if (!topic) return;
+    if (!socket || !topic) return;
     socket.emit("subscribe", topic.trim().toLowerCase());
   };
 
   const sendMessage = () => {
+    if (!socket || !topic) return;
+
     socket.emit("publish", {
       topic: topic.trim().toLowerCase(),
       message: "Hello from client at " + new Date().toLocaleTimeString(),
@@ -41,11 +48,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
-        <h1 className="text-2xl text-amber-800 font-bold mb-4 text-center">
-          Realtime System
-        </h1>
+        <h1 className="text-2xl text-gray-700 font-bold mb-4 text-center">Realtime System</h1>
 
-        <div className="mb-4 text-gray-600 text-sm text-center">
+        <div className="mb-4 text-center text-gray-700 text-sm">
           Status:{" "}
           <span className={connected ? "text-green-600" : "text-red-600"}>
             {connected ? "Connected" : "Disconnected"}
@@ -53,8 +58,8 @@ export default function Home() {
         </div>
 
         <input
-          className="w-full border p-2 placeholder-gray-400 text-black rounded mb-3"
-          placeholder="Enter topic (e.g. news)"
+          className="w-full border text-black p-2 rounded mb-3 text-black"
+          placeholder="Enter topic"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
         />
@@ -62,13 +67,14 @@ export default function Home() {
         <div className="flex gap-2 mb-4">
           <button
             onClick={subscribe}
-            className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 rounded"
+            className="flex-1 bg-blue-500 text-white py-2 rounded"
           >
             Subscribe
           </button>
+
           <button
             onClick={sendMessage}
-            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded"
+            className="flex-1 bg-green-500 text-white py-2 rounded"
           >
             Send
           </button>
@@ -76,15 +82,10 @@ export default function Home() {
 
         <div className="bg-gray-50 p-3 rounded h-40 overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center">
-              No messages yet
-            </p>
+            <p className="text-gray-400 text-sm text-center">No messages yet</p>
           ) : (
             messages.map((msg, i) => (
-              <div
-                key={i}
-                className="bg-white text-gray-700 shadow-sm p-2 mb-2 rounded text-sm"
-              >
+              <div key={i} className="bg-white text-gray-600 p-2 mb-2 rounded text-sm">
                 {msg}
               </div>
             ))
