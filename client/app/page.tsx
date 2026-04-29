@@ -12,8 +12,8 @@ export default function Home() {
   useEffect(() => {
     const newSocket = io("http://localhost", {
       path: "/socket.io",
-      transports: ["polling", "websocket"],
-      upgrade: false,
+      transports: ["websocket"],
+      // upgrade: false,
     });
 
     newSocket.on("connect", () => {
