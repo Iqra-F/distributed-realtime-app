@@ -58,7 +58,7 @@ export default function Home() {
         </div>
 
         <input
-          className="w-full border text-black p-2 rounded mb-3 text-black"
+          className="w-full border  p-2 rounded mb-3 text-black"
           placeholder="Enter topic"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
