@@ -1,5 +1,6 @@
 const authService = require("../services/auth.service");
 const { generateToken } = require("../utils/jwt");
+const jwt = require("jsonwebtoken");
 
 exports.register = async (req, res) => {
   try {
@@ -32,5 +33,21 @@ exports.login = async (req, res) => {
   });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+
+exports.me = (req, res) => {
+  try {
+    const token = req.cookies?.token;
+
+    if (!token) {
+      return res.status(401).json({ user: null });
+    }
+
+    const decoded = jwt.verify(token, "supersecret");
+
+    res.json({ user: decoded });
+  } catch {
+    res.status(401).json({ user: null });
   }
 };

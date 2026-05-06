@@ -1,23 +1,23 @@
+const jwt = require("jsonwebtoken");
+const cookie = require("cookie");
+
 module.exports = (socket, next) => {
   try {
-    console.log("Headers:", socket.handshake.headers);
+    const rawCookie = socket.handshake.headers.cookie;
 
-    const cookies = socket.handshake.headers.cookie;
-
-    if (!cookies) {
-      console.log("❌ No cookies received");
-      return next(new Error("No cookies"));
+    if (!rawCookie) {
+      return next(new Error("No cookies found"));
     }
 
-    const parsed = cookie.parse(cookies);
+    const parsed = cookie.parse(rawCookie);
+
     const token = parsed.token;
 
     if (!token) {
-      console.log("❌ No token in cookies");
       return next(new Error("No token"));
     }
 
-    const decoded = jwt.verify(token, "supersecret");
+    const decoded = jwt.verify(token, "supersecret"); // same as auth-service
 
     socket.user = decoded;
 

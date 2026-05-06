@@ -8,30 +8,63 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [topic, setTopic] = useState("");
   const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let newSocket = null;
 
-    const newSocket = io("http://localhost", {
-      path: "/socket.io",
-      withCredentials: true,
-      transports: ["websocket"],
-      // upgrade: false,
-    });
+    const checkAuthAndConnect = async () => {
+      try {
+        const res = await fetch("http://localhost:4000/auth/me", {
+          credentials: "include",
+        });
 
-    newSocket.on("connect", () => {
-      setConnected(true);
-      console.log("Connected:", newSocket.id);
-    });
+        const data = await res.json();
 
-    newSocket.on("message", (data) => {
-      console.log("Message received from:", data.from);
-      setMessages((prev) => [...prev, data.message]);
-    });
+        if (!data.user) {
+          window.location.href = "/login";
+          return;
+        }
 
-    setSocket(newSocket);
+        // ✅ connect socket AFTER auth
+        newSocket = io("http://localhost", {
+          path: "/socket.io",
+          withCredentials: true,
+          transports: ["websocket"],
+        });
 
-    return () => newSocket.disconnect();
+        newSocket.on("connect", () => {
+          setConnected(true);
+          console.log("Connected:", newSocket.id);
+        });
+
+        newSocket.on("message", (data) => {
+          console.log("Message received from:", data.from);
+          setMessages((prev) => [...prev, data.message]);
+        });
+
+        setSocket(newSocket);
+      } catch (err) {
+        console.error("Auth check failed", err);
+        window.location.href = "/login";
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkAuthAndConnect();
+
+    // ✅ proper cleanup
+    return () => {
+      if (newSocket) {
+        newSocket.disconnect();
+      }
+    };
   }, []);
+
+  if (loading) {
+    return <p className="text-center mt-10">Checking auth...</p>;
+  }
 
   const subscribe = () => {
     if (!socket || !topic) return;
@@ -62,7 +95,7 @@ export default function Home() {
         </div>
 
         <input
-          className="w-full border  p-2 rounded mb-3 text-black"
+          className="w-full border p-2 rounded mb-3 text-black"
           placeholder="Enter topic"
           value={topic}
           onChange={(e) => setTopic(e.target.value)}
@@ -86,7 +119,9 @@ export default function Home() {
 
         <div className="bg-gray-50 p-3 rounded h-40 overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center">No messages yet</p>
+            <p className="text-gray-400 text-sm text-center">
+              No messages yet
+            </p>
           ) : (
             messages.map((msg, i) => (
               <div
