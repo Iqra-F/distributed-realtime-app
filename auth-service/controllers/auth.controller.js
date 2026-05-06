@@ -20,14 +20,16 @@ exports.login = async (req, res) => {
     const user = await authService.login(email, password);
 
     const token = generateToken({ id: user.id, email: user.email });
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-      },
-    });
+ 
+    res
+  .cookie("token", token, {
+    httpOnly: true,
+    secure: false,
+    sameSite: "lax",
+  })
+  .json({
+    message: "Login successful",
+  });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

@@ -10,8 +10,10 @@ export default function Home() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+
     const newSocket = io("http://localhost", {
       path: "/socket.io",
+      withCredentials: true,
       transports: ["websocket"],
       // upgrade: false,
     });
@@ -48,7 +50,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
-        <h1 className="text-2xl text-gray-700 font-bold mb-4 text-center">Realtime System</h1>
+        <h1 className="text-2xl text-gray-700 font-bold mb-4 text-center">
+          Realtime System
+        </h1>
 
         <div className="mb-4 text-center text-gray-700 text-sm">
           Status:{" "}
@@ -85,7 +89,10 @@ export default function Home() {
             <p className="text-gray-400 text-sm text-center">No messages yet</p>
           ) : (
             messages.map((msg, i) => (
-              <div key={i} className="bg-white text-gray-600 p-2 mb-2 rounded text-sm">
+              <div
+                key={i}
+                className="bg-white text-gray-600 p-2 mb-2 rounded text-sm"
+              >
                 {msg}
               </div>
             ))

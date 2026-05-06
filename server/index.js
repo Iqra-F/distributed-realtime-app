@@ -5,7 +5,7 @@ const { Server } = require("socket.io");
 const Redis = require("ioredis");
 const os = require("os");
 const { createAdapter } = require("@socket.io/redis-adapter");
-
+const socketAuth = require("./middlewares/socketAuth");
 const app = express();
 app.use(cors());
 
@@ -44,9 +44,10 @@ io.adapter(createAdapter(pubClient, subClient));
 // =====================
 const instanceId = os.hostname();
 
+io.use(socketAuth);
 io.on("connection", (socket) => {
   console.log(`🟢 Connected: ${socket.id} on ${instanceId}`);
-
+  console.log(socket.user);
   socket.on("subscribe", (topic) => {
     const room = topic.trim().toLowerCase();
     socket.join(room);
