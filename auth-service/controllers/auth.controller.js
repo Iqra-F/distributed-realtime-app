@@ -44,7 +44,7 @@ exports.me = (req, res) => {
       return res.status(401).json({ user: null });
     }
 
-    const decoded = jwt.verify(token, "supersecret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     res.json({ user: decoded });
   } catch {

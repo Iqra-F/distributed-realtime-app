@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const cookie = require("cookie");
+require("dotenv").config();
 
 module.exports = (socket, next) => {
   try {
@@ -17,7 +18,7 @@ module.exports = (socket, next) => {
       return next(new Error("No token"));
     }
 
-    const decoded = jwt.verify(token, "supersecret"); // same as auth-service
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // same as auth-service
 
     socket.user = decoded;
 

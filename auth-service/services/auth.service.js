@@ -1,18 +1,26 @@
 const bcrypt = require("bcryptjs");
+const { PrismaClient } = require("@prisma/client");
 
-const users = []; // temp (later DB)
+const prisma = new PrismaClient();
 
 exports.register = async (email, password) => {
   const hashed = await bcrypt.hash(password, 10);
 
-  const user = { id: Date.now(), email, password: hashed };
-  users.push(user);
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password: hashed,
+    },
+  });
 
   return user;
 };
 
 exports.login = async (email, password) => {
-  const user = users.find((u) => u.email === email);
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
   if (!user) throw new Error("User not found");
 
   const isMatch = await bcrypt.compare(password, user.password);
