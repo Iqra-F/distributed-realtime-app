@@ -8,5 +8,5 @@ RUN npm install
 COPY . .
 
 EXPOSE 4000
-
+RUN npx prisma generate 
 CMD ["npx", "nodemon", "index.js"]

@@ -17,6 +17,7 @@ export default function LoginPage() {
     });
 
     if (res.ok) {
+      alert("Login Successful");
       window.location.href = "/";
     } else {
       alert("Login failed");
