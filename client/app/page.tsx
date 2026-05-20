@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
+import useAuthRedirect from "./hooks/useAuthRedirect";
 
 export default function Home() {
   const [socket, setSocket] = useState(null);
@@ -9,11 +10,25 @@ export default function Home() {
   const [topic, setTopic] = useState("");
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  // useAuthRedirect("guest"); // not logged in → go login, logged in → stay
+  const logout = useCallback(async () => {
+    try {
+      await fetch("http://localhost:4000/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      if (socket) {
+        socket.disconnect();
+      }
+      window.location.href = "/login";
+    }
+  }, [socket]);
 
   useEffect(() => {
-    let newSocket = null;
+    let newSocket;
 
-    const checkAuthAndConnect = async () => {
+    const init = async () => {
       try {
         const res = await fetch("http://localhost:4000/auth/me", {
           credentials: "include",
@@ -26,7 +41,6 @@ export default function Home() {
           return;
         }
 
-        // ✅ connect socket AFTER auth
         newSocket = io("http://localhost", {
           path: "/socket.io",
           withCredentials: true,
@@ -35,11 +49,18 @@ export default function Home() {
 
         newSocket.on("connect", () => {
           setConnected(true);
-          console.log("Connected:", newSocket.id);
+          console.log("Connected to socket server", newSocket.id);
         });
 
+        newSocket.on("disconnect", () => {
+          setConnected(false);
+          console.log("Disconnected from socket server");
+        });
+        newSocket.on("connect_error", () => {
+          setConnected(false);
+          console.error("Connection error to socket server");
+        });
         newSocket.on("message", (data) => {
-          console.log("Message received from:", data.from);
           setMessages((prev) => [...prev, data.message]);
         });
 
@@ -52,19 +73,12 @@ export default function Home() {
       }
     };
 
-    checkAuthAndConnect();
+    init();
 
-    // ✅ proper cleanup
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      if (newSocket) newSocket.disconnect();
     };
   }, []);
-
-  if (loading) {
-    return <p className="text-center mt-10">Checking auth...</p>;
-  }
 
   const subscribe = () => {
     if (!socket || !topic) return;
@@ -76,18 +90,27 @@ export default function Home() {
 
     socket.emit("publish", {
       topic: topic.trim().toLowerCase(),
-      message: "Hello from client at " + new Date().toLocaleTimeString(),
+      message: "Hello at " + new Date().toLocaleTimeString(),
     });
   };
+
+  if (loading) {
+    return <p className="text-center mt-10">Checking auth...</p>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white shadow-lg rounded-xl p-6 w-full max-w-md">
-        <h1 className="text-2xl text-gray-700 font-bold mb-4 text-center">
-          Realtime System
-        </h1>
+        <h1 className="text-2xl font-bold mb-4 text-center">Realtime System</h1>
 
-        <div className="mb-4 text-center text-gray-700 text-sm">
+        <button
+          onClick={logout}
+          className="w-full bg-red-500 text-white py-2 rounded mb-3"
+        >
+          Logout
+        </button>
+
+        <div className="mb-4 text-center text-sm">
           Status:{" "}
           <span className={connected ? "text-green-600" : "text-red-600"}>
             {connected ? "Connected" : "Disconnected"}
@@ -119,15 +142,10 @@ export default function Home() {
 
         <div className="bg-gray-50 p-3 rounded h-40 overflow-y-auto">
           {messages.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center">
-              No messages yet
-            </p>
+            <p className="text-gray-400 text-sm text-center">No messages yet</p>
           ) : (
             messages.map((msg, i) => (
-              <div
-                key={i}
-                className="bg-white text-gray-600 p-2 mb-2 rounded text-sm"
-              >
+              <div key={i} className="bg-white p-2 mb-2 rounded text-sm">
                 {msg}
               </div>
             ))

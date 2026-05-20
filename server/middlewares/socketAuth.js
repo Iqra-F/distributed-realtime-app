@@ -12,7 +12,7 @@ module.exports = (socket, next) => {
 
     const parsed = cookie.parse(rawCookie);
 
-    const token = parsed.token;
+    const token = parsed.accessToken;
 
     if (!token) {
       return next(new Error("No token"));

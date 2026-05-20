@@ -1,23 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import useAuthRedirect from "../hooks/useAuthRedirect";
+import Link from "next/dist/client/link";
 
 export default function LoginPage() {
+  useAuthRedirect(true);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
     const res = await fetch("http://localhost:4000/auth/login", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include", // 🔴 CRITICAL
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ email, password }),
     });
 
     if (res.ok) {
-      alert("Login Successful");
       window.location.href = "/";
     } else {
       alert("Login failed");
@@ -50,6 +51,13 @@ export default function LoginPage() {
         >
           Login
         </button>
+        {/* if not sign up, go to sign up page */}
+        <p className="text-sm mt-2 text-center">
+          Don't have an account?{" "}
+          <Link href="/register" className="text-blue-500 hover:underline">
+            Sign up
+          </Link>
+        </p>
       </div>
     </div>
   );
