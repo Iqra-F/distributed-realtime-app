@@ -5,6 +5,7 @@ services:
       - "5000"
     volumes:
       - ./server:/app
+      - ./shared:/shared
       - /app/node_modules
     depends_on:
       - redis
@@ -15,6 +16,7 @@ services:
       - "3000"
     volumes:
       - ./client:/app
+      - ./shared:/shared
       - /app/node_modules
 
   redis:
@@ -39,6 +41,7 @@ services:
       - "4000:4000"
     volumes:
       - ./auth-service:/app
+      - ./shared:/shared
       - /app/node_modules
 
     depends_on:

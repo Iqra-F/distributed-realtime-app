@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const {log } = require("/shared/logger");
 const cookie = require("cookie");
 require("dotenv").config();
 
@@ -24,7 +25,7 @@ module.exports = (socket, next) => {
 
     next();
   } catch (err) {
-    console.log("❌ Auth error:", err.message);
+    log("Auth error:", { error: err.message });
     next(new Error("Unauthorized"));
   }
 };

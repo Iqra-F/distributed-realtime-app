@@ -6,6 +6,7 @@ const Redis = require("ioredis");
 const os = require("os");
 const { createAdapter } = require("@socket.io/redis-adapter");
 const socketAuth = require("./middlewares/socketAuth");
+const { log } = require("/shared/logger");
 const app = express();
 app.use(cors());
 
@@ -46,12 +47,11 @@ const instanceId = os.hostname();
 
 io.use(socketAuth);
 io.on("connection", (socket) => {
-  console.log(`🟢 Connected: ${socket.id} on ${instanceId}`);
-  console.log(socket.user);
+  log("User connected", { socketId: socket.id, instanceId, user: socket.user });
   socket.on("subscribe", (topic) => {
     const room = topic.trim().toLowerCase();
     socket.join(room);
-    console.log(`📌 ${socket.id} joined ${room}`);
+    log("User subscribed to topic", { socketId: socket.id, topic: room });
   });
 
   socket.on("publish", ({ topic, message }) => {
@@ -66,7 +66,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log(`🔴 Disconnected: ${socket.id}`);
+    log("User disconnected", { socketId: socket.id, instanceId });
   });
 });
 
@@ -76,5 +76,5 @@ app.get("/", (req, res) => {
 });
 
 server.listen(5000, () => {
-  console.log("🚀 Server running on port 5000");
+  log("Server started", { instanceId });
 });

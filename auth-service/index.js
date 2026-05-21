@@ -11,6 +11,7 @@ app.use(cors({
   credentials: true
 }));
 const authRoutes = require("./routes/auth.routes");
+const { log } = require("/shared/logger");
 
 app.use("/auth", authRoutes);
 
@@ -19,5 +20,5 @@ app.get("/", (req, res) => {
 });
 
 app.listen(4000, () => {
-  console.log("🔐 Auth service running on port 4000");
+  log("Auth service running on port 4000");
 });
