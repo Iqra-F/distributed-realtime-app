@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import useAuthRedirect from "../hooks/useAuthRedirect";
-import Link from "next/dist/client/link";
+import Link from "next/link";
 
 export default function LoginPage() {
   useAuthRedirect(true);
@@ -11,17 +11,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
-    const res = await fetch("http://localhost:4000/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ email, password }),
-    });
+    try {
+      const res = await fetch("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (res.ok) {
-      window.location.href = "/";
-    } else {
-      alert("Login failed");
+      if (res.ok) {
+        window.location.href = "/";
+      } else {
+        alert("Login failed");
+      }
+    } catch (err) {
+      alert("Server not reachable");
+      console.error(err);
     }
   };
 

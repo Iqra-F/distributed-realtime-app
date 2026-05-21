@@ -5,7 +5,7 @@ import { useEffect } from "react";
 export default function useAuthRedirect(redirectIfAuth = true) {
   useEffect(() => {
     const check = async () => {
-      const res = await fetch("http://localhost:4000/auth/me", {
+      const res = await fetch("/auth/me", {
         credentials: "include",
       });
 

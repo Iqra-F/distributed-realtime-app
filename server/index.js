@@ -13,11 +13,11 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "http://localhost",
     methods: ["GET", "POST"],
     credentials: true,
   },
-  transports: ["websocket"],
+  // transports: ["websocket"],
 });
 
 // =====================
@@ -31,10 +31,10 @@ const pubClient = new Redis({
 const subClient = pubClient.duplicate();
 
 // IMPORTANT: wait for Redis before attaching adapter
-Promise.all([
-  pubClient.connect?.(),
-  subClient.connect?.(),
-]).catch(() => {});
+// Promise.all([
+//   pubClient.connect?.(),
+//   subClient.connect?.(),
+// ]).catch(() => {});
 
 // Attach adapter (THIS is the core scaling layer)
 io.adapter(createAdapter(pubClient, subClient));

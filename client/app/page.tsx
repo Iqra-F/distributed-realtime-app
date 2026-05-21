@@ -13,7 +13,7 @@ export default function Home() {
   // useAuthRedirect("guest"); // not logged in → go login, logged in → stay
   const logout = useCallback(async () => {
     try {
-      await fetch("http://localhost:4000/auth/logout", {
+      await fetch("/auth/logout", {
         method: "POST",
         credentials: "include",
       });
@@ -30,7 +30,7 @@ export default function Home() {
 
     const init = async () => {
       try {
-        const res = await fetch("http://localhost:4000/auth/me", {
+        const res = await fetch("/auth/me", {
           credentials: "include",
         });
 
@@ -41,10 +41,10 @@ export default function Home() {
           return;
         }
 
-        newSocket = io("http://localhost", {
+        newSocket = io("/", {
           path: "/socket.io",
           withCredentials: true,
-          transports: ["websocket"],
+          // transports: ["websocket"],
         });
 
         newSocket.on("connect", () => {
