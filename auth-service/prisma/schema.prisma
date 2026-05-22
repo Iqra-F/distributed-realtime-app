@@ -18,13 +18,17 @@ model User {
 }
 
 model RefreshToken {
-  id        Int      @id @default(autoincrement())
-  tokenHash     String   @unique
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  tokenHash   String?   @unique
 
-  createdAt DateTime @default(now())
-  expiresAt DateTime
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
 
-  revoked   Boolean  @default(false)
+  familyId    String?   //  SESSION IDENTIFIER (VERY IMPORTANT)
+
+  revoked     Boolean  @default(false)
+  replacedBy  String?  // next token hash (rotation tracking)
+
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
 }

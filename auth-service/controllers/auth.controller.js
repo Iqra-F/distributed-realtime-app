@@ -3,25 +3,35 @@ const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
 const jwt = require("jsonwebtoken");
 const { hashToken } = require("../utils/hashToken");
 const { PrismaClient } = require("@prisma/client");
+const crypto = require("crypto");
 
 const prisma = new PrismaClient();
+
+/* ---------------- REGISTER ---------------- */
 exports.register = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await authService.register(email, password);
-    const { password: _, ...safeUser } = user; // Exclude password from response
-    res.json({ message: "User registered", user: safeUser });
+    const { password: _, ...safeUser } = user;
+
+    res.json({
+      message: "User registered",
+      user: safeUser,
+    });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
+/* ---------------- LOGIN ---------------- */
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await authService.login(email, password);
+
+    const familyId = crypto.randomUUID(); // 🔐 SESSION GROUP ID
 
     const accessToken = generateAccessToken({
       id: user.id,
@@ -31,13 +41,14 @@ exports.login = async (req, res) => {
     const refreshToken = generateRefreshToken({
       id: user.id,
       email: user.email,
+      familyId,
     });
 
-    // store refresh token in DB
     await prisma.refreshToken.create({
       data: {
         tokenHash: hashToken(refreshToken),
         userId: user.id,
+        familyId,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -55,31 +66,29 @@ exports.login = async (req, res) => {
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       })
-      .json({
-        message: "Login successful",
-      });
+      .json({ message: "Login successful" });
 
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 };
 
+/* ---------------- ME ---------------- */
 exports.me = (req, res) => {
   try {
-    const accessToken = req.cookies?.accessToken;
+    const token = req.cookies?.accessToken;
 
-    if (!accessToken) {
-      return res.status(401).json({ user: null });
-    }
+    if (!token) return res.status(401).json({ user: null });
 
-    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     res.json({ user: decoded });
   } catch {
     res.status(401).json({ user: null });
   }
 };
-//refresh token endpoint
+
+/* ---------------- REFRESH (ROTATION + REUSE DETECTION) ---------------- */
 exports.refresh = async (req, res) => {
   try {
     const token = req.cookies?.refreshToken;
@@ -87,52 +96,41 @@ exports.refresh = async (req, res) => {
     if (!token) {
       return res.status(401).json({ error: "No refresh token" });
     }
+
     const hashedToken = hashToken(token);
-    // check DB
+
     const storedToken = await prisma.refreshToken.findUnique({
-      where: {
-         tokenHash: hashedToken,
-         },
+      where: { tokenHash: hashedToken },
     });
-    // check if token is expired or revoked, Add cleanup for expired sessions
-    if (storedToken?.expiresAt < new Date()) {
-  return res.status(401).json({
-    error: "Session expired",
-  });
-}
-if (!storedToken) {
-  return res.status(401).json({
-    error: "Invalid session",
-  });
-}
 
-// TOKEN REUSE DETECTED
-if (storedToken.revoked) {
-  await prisma.refreshToken.updateMany({
-    where: {
-      userId: storedToken.userId,
-    },
-    data: {
-      revoked: true,
-    },
-  });
+    if (!storedToken) {
+      return res.status(401).json({ error: "Invalid session" });
+    }
 
-  return res.status(401).json({
-    error: "Session reuse detected. All sessions revoked.",
-  });
-}
+    if (storedToken.expiresAt < new Date()) {
+      return res.status(401).json({ error: "Session expired" });
+    }
+
+    // 🔐 REUSE DETECTION
+    if (storedToken.revoked) {
+      await prisma.refreshToken.updateMany({
+        where: { userId: storedToken.userId },
+        data: { revoked: true },
+      });
+
+      return res.status(401).json({
+        error: "Session reuse detected. All sessions revoked.",
+      });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 
-    // ROTATE: revoke old token
+    // ROTATE OLD TOKEN
     await prisma.refreshToken.update({
-      where: {
-  tokenHash: hashedToken,
-},
+      where: { tokenHash: hashedToken },
       data: { revoked: true },
     });
 
-    // create new tokens
     const newAccessToken = generateAccessToken({
       id: decoded.id,
       email: decoded.email,
@@ -141,12 +139,14 @@ if (storedToken.revoked) {
     const newRefreshToken = generateRefreshToken({
       id: decoded.id,
       email: decoded.email,
+      familyId: storedToken.familyId,
     });
 
     await prisma.refreshToken.create({
       data: {
         tokenHash: hashToken(newRefreshToken),
         userId: decoded.id,
+        familyId: storedToken.familyId,
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -170,7 +170,8 @@ if (storedToken.revoked) {
     res.status(401).json({ error: "Invalid refresh token" });
   }
 };
-//logout endpoint
+
+/* ---------------- LOGOUT ---------------- */
 exports.logout = async (req, res) => {
   const token = req.cookies?.refreshToken;
 
@@ -178,9 +179,7 @@ exports.logout = async (req, res) => {
     const hashedToken = hashToken(token);
 
     await prisma.refreshToken.updateMany({
-      where: {
-        tokenHash: hashedToken,
-      },
+      where: { tokenHash: hashedToken },
       data: { revoked: true },
     });
   }
