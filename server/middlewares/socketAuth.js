@@ -1,28 +1,21 @@
-const jwt = require("jsonwebtoken");
-const {log } = require("/shared/logger");
+const { verifyAccessToken } = require("../utils/auth");
 const cookie = require("cookie");
-require("dotenv").config();
+const { log } = require("/shared/logger");
 
 module.exports = (socket, next) => {
   try {
     const rawCookie = socket.handshake.headers.cookie;
 
-    if (!rawCookie) {
-      return next(new Error("No cookies found"));
-    }
+    if (!rawCookie) return next(new Error("No cookies found"));
 
     const parsed = cookie.parse(rawCookie);
-
     const token = parsed.accessToken;
 
-    if (!token) {
-      return next(new Error("No token"));
-    }
+    const decoded = verifyAccessToken(token);
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET); // same as auth-service
+    if (!decoded) return next(new Error("Unauthorized"));
 
     socket.user = decoded;
-
     next();
   } catch (err) {
     log("Auth error:", { error: err.message });

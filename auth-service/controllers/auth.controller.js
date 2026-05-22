@@ -1,6 +1,6 @@
 const authService = require("../services/auth.service");
 const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
-const jwt = require("jsonwebtoken");
+const { verifyAccessToken } = require("../utils/auth");
 const { hashToken } = require("../utils/hashToken");
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
@@ -75,17 +75,15 @@ exports.login = async (req, res) => {
 
 /* ---------------- ME ---------------- */
 exports.me = (req, res) => {
-  try {
-    const token = req.cookies?.accessToken;
+  const token = req.cookies?.accessToken;
 
-    if (!token) return res.status(401).json({ user: null });
+  const decoded = verifyAccessToken(token);
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    res.json({ user: decoded });
-  } catch {
-    res.status(401).json({ user: null });
+  if (!decoded) {
+    return res.status(401).json({ user: null });
   }
+
+  res.json({ user: decoded });
 };
 
 /* ---------------- REFRESH (ROTATION + REUSE DETECTION) ---------------- */
