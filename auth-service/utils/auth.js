@@ -1,3 +1,4 @@
+// auth-service/utils/auth.js
 const jwt = require("jsonwebtoken");
 
 function verifyAccessToken(token) {

@@ -1,5 +1,4 @@
-# Use Node image from Docker Hub
-# “Give me a machine with Node.js installed, version 18”
+# Dockerfile for the server
 FROM node:20
 # Inside container, create folder /app
 

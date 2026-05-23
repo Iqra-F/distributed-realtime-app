@@ -1,3 +1,4 @@
+// auth-service/utils/hashToken.js
 const crypto = require("crypto");
 
 exports.hashToken = (token) => {

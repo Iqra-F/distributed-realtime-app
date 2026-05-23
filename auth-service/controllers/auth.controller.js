@@ -1,10 +1,11 @@
+// auth-service/controllers/auth.controller.js
 const authService = require("../services/auth.service");
 const { generateAccessToken, generateRefreshToken } = require("../utils/jwt");
 const { verifyAccessToken } = require("../utils/auth");
 const { hashToken } = require("../utils/hashToken");
 const { PrismaClient } = require("@prisma/client");
 const crypto = require("crypto");
-
+const jwt = require("jsonwebtoken");
 const prisma = new PrismaClient();
 
 /* ---------------- REGISTER ---------------- */

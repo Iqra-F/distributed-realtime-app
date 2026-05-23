@@ -1,8 +1,10 @@
+// client/app/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { io } from "socket.io-client";
 import useAuthRedirect from "./hooks/useAuthRedirect";
+import { authFetch } from "./lib/authFetch";
 
 export default function Home() {
   const [socket, setSocket] = useState(null);
@@ -30,9 +32,13 @@ export default function Home() {
 
     const init = async () => {
       try {
-        const res = await fetch("/auth/me", {
-          credentials: "include",
-        });
+            // STEP 1: refresh auth first
+        await fetch("/auth/refresh", {
+  method: "POST",
+  credentials: "include",
+});
+// STEP 2: verify session
+        const res = await authFetch("/auth/me");
 
         const data = await res.json();
 
@@ -41,11 +47,17 @@ export default function Home() {
           return;
         }
 
+        // WAIT until browser settles auth cookies fully
+        await new Promise((r) => setTimeout(r, 50));
+
+    // STEP 3: create socket
         newSocket = io("/", {
           path: "/socket.io",
           withCredentials: true,
+          autoConnect: false,
           // transports: ["websocket"],
         });
+        newSocket.connect();
 
         newSocket.on("connect", () => {
           setConnected(true);
@@ -56,9 +68,17 @@ export default function Home() {
           setConnected(false);
           console.log("Disconnected from socket server");
         });
-        newSocket.on("connect_error", () => {
-          setConnected(false);
-          console.error("Connection error to socket server");
+        newSocket.on("connect_error", (err) => {
+          console.error("Socket connect error:", {
+            message: err.message,
+            description: err.description,
+            context: err.context,
+          });
+
+          // optional safety retry once
+          setTimeout(() => {
+            newSocket.connect();
+          }, 1000);
         });
         newSocket.on("message", (data) => {
           setMessages((prev) => [...prev, data.message]);

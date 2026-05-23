@@ -1,3 +1,4 @@
+// auth-service/utils/jwt.js
 const jwt = require("jsonwebtoken");
 
 exports.generateAccessToken = (payload) => {

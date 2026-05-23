@@ -1,3 +1,4 @@
+// auth-service/services/auth.service.js
 const bcrypt = require("bcryptjs");
 const { PrismaClient } = require("@prisma/client");
 
