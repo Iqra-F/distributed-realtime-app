@@ -1,7 +1,6 @@
 Distributed Realtime App
 
-A production-focused distributed realtime application built with microservices, WebSockets, Redis pub/sub, PostgreSQL, Docker, and JWT authentication.
-
+A production-focused distributed realtime application built with microservices, WebSockets, Redis Pub/Sub, PostgreSQL, Docker, Nginx, and JWT authentication.
 
 ---
 
@@ -11,437 +10,633 @@ Services
 
 Auth Service
 
-Handles:
+Responsible for:
 
-User registration
+- User registration
+- User login
+- JWT access token generation
+- Refresh token generation
+- Refresh token rotation
+- Session management
+- Session recovery
+- Logout
+- Session revocation
+- Refresh token reuse detection
 
-User login
-
-JWT authentication
-
-Refresh token rotation
-
-Session management
-
-Logout
-
+---
 
 Realtime Server
 
-Handles:
+Responsible for:
 
-WebSocket connections
+- WebSocket connections
+- Socket authentication
+- Topic subscriptions
+- Realtime message broadcasting
+- Redis adapter integration
+- Cross-instance event propagation
 
-Topic subscriptions
+---
 
-Realtime message broadcasting
+Client (Next.js)
 
-Redis adapter scaling
+Responsible for:
 
-Socket authentication
+- User authentication flows
+- Silent authentication
+- Session persistence
+- Automatic token refresh
+- Realtime communication
+- Topic subscription UI
+- Message publishing and receiving
 
-
-Client
-
-Frontend application using:
-
-Next.js
-
-Socket.io client
-
-Cookie-based authentication
-
+---
 
 Redis
 
 Used for:
 
-Socket.io Redis adapter
-
-Cross-instance realtime event propagation
-
-
-PostgreSQL
-
-Primary database storing:
-
-Users
-
-Refresh token sessions
-
-
-Nginx
-
-Reverse proxy for:
-
-Frontend routing
-
-API gateway routing
-
-WebSocket proxying
-
-
+- Socket.IO Redis adapter
+- Cross-instance event propagation
+- Distributed realtime communication
 
 ---
 
-Current Features
+PostgreSQL
+
+Stores:
+
+- Users
+- Refresh token sessions
+- Session metadata
+
+---
+
+Nginx
+
+Acts as:
+
+- Reverse proxy
+- API gateway
+- WebSocket proxy
+- Frontend routing layer
+
+---
+
+Architecture
+
+Browser
+   │
+   ▼
+Nginx
+   │
+   ├── /auth/* ─────► Auth Service
+   │
+   ├── /socket.io/* ─► Realtime Server
+   │
+   └── / ───────────► Next.js Client
+
+Realtime Server
+      │
+      ▼
+Redis Adapter
+      │
+      ▼
+Other Realtime Instances
+
+Auth Service
+      │
+      ▼
+PostgreSQL
+
+---
 
 Authentication System
 
 JWT Authentication
 
-Access tokens
+Uses:
 
-Refresh tokens
+- Access Tokens (15 minutes)
+- Refresh Tokens (7 days)
+- HTTP-only Cookies
 
-HTTP-only cookies
+Authentication flow:
 
-Cookie-based auth flow
+Login
+  │
+  ▼
+Generate Access Token
+Generate Refresh Token
+  │
+  ▼
+Store Refresh Session
+  │
+  ▼
+Send Cookies
 
+---
+
+Cookie-Based Authentication
+
+Tokens are stored in:
+
+- HTTP-only cookies
+- Not accessible via JavaScript
+- Automatically included in requests
+
+Cookies:
+
+accessToken
+refreshToken
+
+---
+
+Silent Authentication
+
+When an access token expires:
+
+1. Frontend automatically detects the failure
+2. Calls "/auth/refresh"
+3. Backend rotates the refresh token
+4. New access token is issued
+5. Original request is retried automatically
+
+User remains authenticated without seeing a login screen.
+
+---
+
+Automatic Access Token Refresh
+
+The frontend uses a centralized authenticated fetch wrapper.
+
+Features:
+
+- Detects expired access tokens
+- Automatically refreshes session
+- Retries original request
+- Prevents unnecessary logouts
+- Works transparently for protected requests
+
+---
+
+Persistent Login
+
+Users remain authenticated after:
+
+- Browser restart
+- Closing and reopening tabs
+- Page refresh
+
+As long as a valid refresh token session exists.
+
+---
+
+Session Recovery
+
+If:
+
+access token expired
+refresh token valid
+
+The application automatically restores authentication and continues operating without requiring manual login.
+
+---
 
 Refresh Token Rotation
 
 Every refresh request:
 
-1. Revokes previous refresh token
+1. Validates refresh token
+2. Revokes previous token
+3. Generates new refresh token
+4. Generates new access token
+5. Stores new session record
 
+Benefits:
 
-2. Generates a new refresh token
-
-
-3. Generates a new access token
-
-
-4. Stores the new session in database
-
-
-
-This prevents replay attacks.
-
+- Prevents replay attacks
+- Limits stolen token usefulness
+- Improves session security
 
 ---
 
-Database-Backed Sessions
-
-Refresh tokens are stored in PostgreSQL.
-
-Stored fields:
-
-tokenHash
-
-userId
-
-familyId
-
-revoked
-
-replacedBy
-
-createdAt
-
-expiresAt
-
-
-
----
-
-Hashed Refresh Tokens
+Hashed Refresh Token Storage
 
 Refresh tokens are never stored directly.
 
-Instead:
+Database stores:
 
-SHA-256 hashes are stored
+SHA-256(token)
 
-Raw refresh tokens remain only in HTTP-only cookies
+Benefits:
 
-
-This protects sessions even if database leaks.
-
+- Database leak protection
+- Session security
+- Industry-standard practice
 
 ---
 
 Refresh Token Reuse Detection
 
-System detects:
+Detects:
 
-reused revoked tokens
-
-stolen refresh tokens
-
-replay attacks
-
+- Stolen refresh tokens
+- Reused revoked tokens
+- Replay attacks
 
 On detection:
 
-all user sessions are revoked automatically
+All user sessions revoked
 
-
-This is a production-grade security mechanism.
-
+This is a production-grade security mechanism used by modern authentication systems.
 
 ---
 
-Centralized Auth Verification
+Database-Backed Sessions
 
-Authentication verification logic has been standardized.
+Refresh token sessions are stored in PostgreSQL.
 
-Per-service reusable auth utilities:
+Stored fields:
 
-auth-service
-
-utils/auth.js
-
-realtime server
-
-utils/auth.js
+tokenHash
+userId
+familyId
+revoked
+replacedBy
+createdAt
+expiresAt
 
 Benefits:
 
-reduced duplicated JWT logic
-
-consistent verification behavior
-
-cleaner microservice separation
-
-easier future maintenance
-
-
+- Session revocation
+- Future multi-device support
+- Session auditing
+- Device management foundation
 
 ---
 
 Realtime System
 
-WebSocket Authentication
+Socket Authentication
 
-Socket connections authenticate using:
+Socket connections require:
 
 accessToken cookie
 
+Authentication occurs during the Socket.IO handshake.
 
-Unauthenticated sockets are rejected.
+Unauthorized connections are rejected before establishing a realtime connection.
 
+---
+
+Topic-Based Messaging
+
+Clients can:
+
+Subscribe to topic
+Publish message to topic
+Receive messages from topic
+
+Examples:
+
+sports
+news
+chat
+alerts
 
 ---
 
 Redis Adapter Scaling
 
-Socket.io Redis adapter enables:
+Socket.IO Redis adapter enables:
 
-horizontal scaling
+- Horizontal scaling
+- Multi-instance communication
+- Distributed event broadcasting
 
-multi-instance realtime broadcasting
-
-distributed websocket communication
-
-
+Messages published on one instance are automatically delivered to subscribers connected to other instances.
 
 ---
 
-Dockerized Infrastructure
+Cross-Client Realtime Messaging
 
-Services run using Docker Compose.
+Verified working:
 
-Includes:
-
-auth-service
-
-realtime server
-
-client
-
-postgres
-
-redis
-
-nginx
-
-
+- Multiple browser tabs
+- Multiple authenticated users
+- Shared topic subscriptions
+- Realtime message propagation
 
 ---
 
 Security Features
 
-Implemented
+Implemented:
 
-Password hashing with bcrypt
+✅ Password hashing (bcrypt)
 
-Access token expiration
+✅ JWT access tokens
 
-Refresh token rotation
+✅ Refresh tokens
 
-Hashed refresh token storage
+✅ HTTP-only cookies
 
-Session revocation
+✅ Refresh token rotation
 
-Replay attack detection
+✅ Hashed refresh token storage
 
-HTTP-only cookies
+✅ Database-backed sessions
 
-Database-backed auth sessions
+✅ Session revocation
 
+✅ Refresh token reuse detection
 
+✅ Silent authentication
 
----
+✅ Automatic token refresh
 
-Current Tech Stack
+✅ Persistent login
 
-Backend
+✅ Session recovery
 
-Node.js
+✅ Socket authentication
 
-Express.js
-
-Socket.io
-
-Prisma ORM
-
-PostgreSQL
-
-Redis
-
-JWT
-
-
-Frontend
-
-Next.js
-
-React
-
-Socket.io Client
-
-
-Infrastructure
-
-Docker
-
-Docker Compose
-
-Nginx
-
-
+✅ Protected websocket connections
 
 ---
 
-Current Project Structure
+Configuration Management
 
-project-root/
-│
-├── auth-service/
-│   ├── controllers/
-│   ├── routes/
-│   ├── services/
-│   ├── utils/
-│   └── prisma/
-│
-├── server/
-│   ├── middlewares/
-│   ├── utils/
-│   └── index.js
-│
-├── client/
-│
-├── shared/
-│   └── logger/
-│
-├── nginx/
-│
-└── docker-compose.yml
+Environment variables are centralized through Docker.
 
+Example:
+
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app_db
+
+JWT_SECRET=your-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+
+Benefits:
+
+- Consistent secrets across services
+- Easier deployment
+- Reduced configuration drift
 
 ---
 
-Upcoming Phase
+Dockerized Infrastructure
 
-Silent Authentication (Frontend)
+Services run via Docker Compose.
 
-Next implementation goals:
+Included containers:
 
-automatic access token refresh
-
-persistent login after browser restart
-
-silent re-authentication
-
-auth recovery without manual login
-
-production-grade frontend auth UX
-
-
+client
+auth-service
+server
+redis
+postgres
+nginx
 
 ---
-
-Future Enhancements
-
-Potential future upgrades:
-
-role-based access control (RBAC)
-
-logout all devices
-
-multi-device session management
-
-audit logs
-
-rate limiting
-
-token/device fingerprinting
-
-distributed tracing
-
-centralized monitoring
-
-API gateway auth middleware
-
-
-
----
-
-Development Commands
 
 Start System
 
 docker compose up
 
-Run Detached
+---
+
+Build and Start
+
+docker compose up --build
+
+---
+
+Detached Mode
 
 docker compose up -d
 
-Stop Containers
+---
+
+Stop System
 
 docker compose down
+
+---
+
+Database Commands
 
 Prisma Migration
 
 docker compose exec auth-service npx prisma migrate dev
 
+---
+
 Prisma Studio
 
 docker compose exec auth-service npx prisma studio
 
+---
+
+Project Structure
+
+project-root/
+│
+├── .env
+│
+├── auth-service/
+│   ├── controllers/
+│   │   └── auth.controller.js
+│   │
+│   ├── routes/
+│   │   └── auth.routes.js
+│   │
+│   ├── services/
+│   │   └── auth.service.js
+│   │
+│   ├── utils/
+│   │   ├── auth.js
+│   │   ├── jwt.js
+│   │   └── hashToken.js
+│   │
+│   ├── prisma/
+│   │   └── schema.prisma
+│   │
+│   ├── Dockerfile
+│   └── index.js
+│
+├── server/
+│   ├── middlewares/
+│   │   └── socketAuth.js
+│   │
+│   ├── utils/
+│   │   └── auth.js
+│   │
+│   ├── Dockerfile
+│   └── index.js
+│
+├── client/
+│   ├── app/
+│   │   ├── hooks/
+│   │   │   └── useAuthRedirect.ts
+│   │   │
+│   │   ├── lib/
+│   │   │   └── authFetch.ts
+│   │   │
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── register/
+│   │   │   └── page.tsx
+│   │   │
+│   │   ├── layout.tsx
+│   │   ├── page.tsx
+│   │   └── globals.css
+│   │
+│   ├── public/
+│   ├── Dockerfile
+│   └── package.json
+│
+├── shared/
+│   └── logger/
+│
+├── nginx/
+│   └── nginx.conf
+│
+├── docker-compose.yml
+│
+└── README.md
+
+---
+
+Tech Stack
+
+Backend
+
+- Node.js
+- Express.js
+- Socket.IO
+- Prisma ORM
+- PostgreSQL
+- Redis
+- JWT
+- bcrypt
+
+---
+
+Frontend
+
+- Next.js
+- React
+- Socket.IO Client
+
+---
+
+Infrastructure
+
+- Docker
+- Docker Compose
+- Nginx
 
 ---
 
 Current Status
 
-The system now includes:
+Implemented:
 
-distributed realtime infrastructure
+✅ Distributed realtime messaging
 
-websocket scaling
+✅ Socket.IO Redis adapter
 
-production-style JWT auth
+✅ JWT authentication
 
-refresh token rotation
+✅ Access token & refresh token architecture
 
-database-backed sessions
+✅ Refresh token rotation
 
-replay attack detection
+✅ Hashed refresh token storage
 
-centralized auth verification
+✅ Database-backed sessions
 
-Dockerized microservices architecture
+✅ Session revocation
 
+✅ Refresh token reuse detection
 
-The next major milestone is implementing silent frontend authentication.
+✅ Cookie-based authentication
+
+✅ Silent authentication
+
+✅ Automatic access token refresh
+
+✅ Persistent login after browser restart
+
+✅ Session recovery without manual login
+
+✅ Socket authentication
+
+✅ Protected websocket connections
+
+✅ Dockerized microservices
+
+✅ Nginx reverse proxy
+
+✅ Environment-based configuration
+
+✅ Cross-client realtime messaging
+
+---
+
+Upcoming Milestones
+
+Realtime Improvements
+
+- Socket reconnection strategy
+- Automatic room rejoin after reconnect
+- Presence tracking
+- User activity indicators
+
+---
+
+Security
+
+- Role-Based Access Control (RBAC)
+- Logout from all devices
+- Multi-device session management
+- Rate limiting
+- Audit logs
+- Device fingerprinting
+
+---
+
+Infrastructure
+
+- Multi-instance load testing
+- Centralized monitoring
+- Distributed tracing
+- API gateway authentication
+- CI/CD pipeline
+
+---
+
+Developer Experience
+
+- Shared configuration module
+- Structured error handling
+- Centralized logging improvements
+- Health monitoring endpoints
+
+---
+
+Goal
+
+Build a production-style distributed system demonstrating:
+
+- Secure authentication
+- Session management
+- Realtime communication
+- Horizontal scalability
+- Microservice architecture
+- Containerized deployment
+- Modern backend engineering practices
+
+This project is designed as a learning and portfolio-grade example of how distributed realtime systems are built and secured in modern production environments.
